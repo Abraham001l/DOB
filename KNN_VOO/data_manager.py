@@ -138,14 +138,7 @@ class KNN_DataManager:
         data.loc[:, 'volume_ratio'] = data['volume'] / data['volume'].rolling(window=20).mean()
 
         # RSI
-        window = 14
-        delta = data['adj_close'].diff()
-        gain = delta.clip(lower=0)
-        loss = -delta.clip(upper=0)
-        avg_gain = gain.ewm(alpha=1/window, min_periods=window, adjust=False).mean()
-        avg_loss = loss.ewm(alpha=1/window, min_periods=window, adjust=False).mean()
-        rs = avg_gain / avg_loss
-        data.loc[:, 'rsi'] = 100 - (100 / (1 + rs))
+        data.loc[:, 'rsi'] = 100 - (100 / (1 + (data['return'].rolling(window=14).mean() / data['return'].rolling(window=14).std())))
 
         # Volatility (Standard Deviation of Returns over a 20-day window)
         data.loc[:, 'volatility'] = data['return'].rolling(window=20).std() * np.sqrt(252)  # Annualized volatility
