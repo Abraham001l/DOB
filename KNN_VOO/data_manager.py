@@ -113,17 +113,17 @@ class KNN_DataManager:
             self.conn.commit()
     
     # Update VOO_KNN
-    def update_training(self):
-        # Turning VOO_BASE into a 
+    def update_features(self):
+        # Turning VOO_BASE into a pandas DataFrame 
         engine = create_engine(f"postgresql://{self.sql_user}:{self.sql_password}@localhost:5432/{self.db_name}")
         data = pd.read_sql_table('voo_base', con=engine)
 
-        # Percent gain predicted
-        prcnt_gain = .01
+        # Percent breakout predicted
+        prcnt_breakout = .01
 
         # ---------- Creating Features ----------
         data['return'] = data['adj_close'].pct_change()
-        data.dropna()
+        data.dropna(inplace=True)
 
         # MACD (Percentage)
         ema_12 = data['adj_close'].ewm(span=12, adjust=False).mean()
@@ -137,11 +137,15 @@ class KNN_DataManager:
         # Volume Ratio
         data.loc[:, 'volume_ratio'] = data['volume'] / data['volume'].rolling(window=20).mean()
 
-        # ATR
-        data.loc[:, 'atr'] = data['high'].rolling(window=14).max() - data['low'].rolling(window=14).min()
-
         # RSI
-        data.loc[:, 'rsi'] = 100 - (100 / (1 + (data['return'].rolling(window=14).mean() / data['return'].rolling(window=14).std())))
+        window = 14
+        delta = data['adj_close'].diff()
+        gain = delta.clip(lower=0)
+        loss = -delta.clip(upper=0)
+        avg_gain = gain.ewm(alpha=1/window, min_periods=window, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1/window, min_periods=window, adjust=False).mean()
+        rs = avg_gain / avg_loss
+        data.loc[:, 'rsi'] = 100 - (100 / (1 + rs))
 
         # Volatility (Standard Deviation of Returns over a 20-day window)
         data.loc[:, 'volatility'] = data['return'].rolling(window=20).std() * np.sqrt(252)  # Annualized volatility
@@ -149,7 +153,7 @@ class KNN_DataManager:
         data.dropna(inplace=True)
 
         # Adding Breakout Labels
-        data.loc[:, 'breakout'] = (data['adj_close'].shift(-5) >= (data['adj_close'] * (1+prcnt_gain))).astype(int)
+        data.loc[:, 'breakout'] = (data['adj_close'].shift(-5) >= (data['adj_close'] * (1+prcnt_breakout))).astype(int)
         data.dropna(inplace=True)
         data.reset_index(drop=True, inplace=True)
 
@@ -160,11 +164,11 @@ class KNN_DataManager:
             if_exists='replace',      # Options: 'fail', 'replace', 'append'
             index=False               # Do not write DataFrame index as a column
         )
+    
+    # Getting the Featured Data
+    def get_featured_data(self):
+        # Turning VOO_KNN into a pandas DataFrame
+        engine = create_engine(f"postgresql://{self.sql_user}:{self.sql_password}@localhost:5432/{self.db_name}")
+        data = pd.read_sql_table('voo_knn', con=engine)
+        return data
 
-
-
-
-
-knn_manager = KNN_DataManager()
-knn_manager.update_training()
-del knn_manager
