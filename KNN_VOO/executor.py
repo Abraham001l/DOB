@@ -5,6 +5,7 @@ import sys
 import pandas as pd
 import os
 import matplotlib.pyplot as plt
+import math
 
 class KNN_Executor():
     def __init__(self):
@@ -48,7 +49,7 @@ class KNN_Executor():
         labels = self.ft_data_cropped['breakout']
 
         # Training KNN model
-        k = 3
+        k = 10
         knn = KNeighborsClassifier(n_neighbors=k)
         knn.fit(features, labels)
 
@@ -86,6 +87,7 @@ class KNN_Executor():
             if (row['date'] <= end_date and end_i == -1):
                 end_i = index
         ft_data_cropped = self.ft_data.iloc[start_i:end_i+1]
+        ft_data_cropped.reset_index(drop=True, inplace=True)
 
         # Setup variables
         balance = 100
@@ -93,6 +95,9 @@ class KNN_Executor():
         invested = False
         days_invested = 0
         entry_price = 0
+
+        imp_x = []
+        imp_y = []
 
         print(ft_data_cropped.iloc[len(ft_data_cropped['adj_close'])-1]['adj_close']/ft_data_cropped.iloc[0]['adj_close'])
 
@@ -102,13 +107,17 @@ class KNN_Executor():
                 # Run model
                 invested = self.run_model(row['date'])
                 entry_price = row['adj_close']
+                balances.append(balance)
             else:
                 days_invested += 1
                 if days_invested == 5:
                     invested = False
                     days_invested = 0
                     balance *= row['adj_close']/entry_price
-            balances.append(balance)
+                    balances.append(balance)
+                else:
+                    balances.append(balance*row['adj_close']/entry_price)
+            
         
         plt.plot([i for i in range(len(balances))],balances)
         plt.show()
@@ -122,8 +131,5 @@ class KNN_Executor():
 knn_executor = KNN_Executor()
 knn_executor.train('VOO_2020-01-01_2024-01-01.pkl', '2020-01-01', '2024-01-01')
 knn_executor.load_model('VOO_2020-01-01_2024-01-01.pkl')
-knn_executor.simulate('2024-01-02', '2024-12-30')
+knn_executor.simulate('2024-01-01', '2025-01-01')
 del knn_executor
-
-# 2019-12-31 00:00:00
-# 2019-12-31 00:00:00
